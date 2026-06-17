@@ -90,7 +90,21 @@ def parse_cf7(text):
             result[field] = m.group(1).strip()
     return result
 
-# ── КОМАНДЫ ──────────────────────────────────────────────────────
+@dp.message(F.text.contains("Заявка на сайт"))
+async def handle_cf7_lead(message: Message):
+    if message.chat.id != LEADS_GROUP_ID:
+        return
+    data = parse_cf7(message.text)
+    if not data.get("name"):
+        return
+    name = data["name"]
+    phone = data.get("phone", "")
+    topic = data.get("topic", "")
+    title = f"{name} — {topic}" if topic else name
+    desc = f"Телефон: {phone}\nТема: {topic}"
+    result = await create_lead(title, source="Яндекс", description=desc)
+    if "error" not in result:
+        await message.reply(f"✅ Лид создан\n*{title}*\n📞 {phone}\n📂 Первое касание", parse_mode="Markdown")
 
 @dp.message(Command("start"))
 async def cmd_start(message: Message):
@@ -178,24 +192,6 @@ async def cmd_stats(message: Message):
     for src, cnt in sorted(by_src.items(), key=lambda x: -x[1]):
         lines.append(f"  {src}: {cnt}")
     await message.answer("\n".join(lines), parse_mode="Markdown")
-
-# ── ВСЕ ОСТАЛЬНЫЕ СООБЩЕНИЯ ──────────────────────────────────────
-
-@dp.message()
-async def handle_all(message: Message):
-    text = message.text or ""
-    print(f"MSG: chat={message.chat.id} user={message.from_user.username} is_bot={message.from_user.is_bot} text={text[:80]}")
-    if "Заявка на сайт" in text and message.chat.id == LEADS_GROUP_ID:
-        data = parse_cf7(text)
-        if data.get("name"):
-            name = data["name"]
-            phone = data.get("phone", "")
-            topic = data.get("topic", "")
-            title = f"{name} — {topic}" if topic else name
-            desc = f"Телефон: {phone}\nТема: {topic}"
-            result = await create_lead(title, source="Яндекс", description=desc)
-            if "error" not in result:
-                await message.reply(f"✅ Лид создан\n*{title}*\n📞 {phone}\n📂 Первое касание", parse_mode="Markdown")
 
 async def main():
     await dp.start_polling(bot, allowed_updates=["message", "channel_post"])
