@@ -211,19 +211,28 @@ async def run_agent(user_message, history):
 
     max_steps = 8
     for step in range(max_steps):
-        async with httpx.AsyncClient(timeout=30.0, proxy=PROXY_URL) as client:
+        async with httpx.AsyncClient(timeout=60.0) as client:
             r = await client.post(
-                "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent",
-                headers={"Content-Type": "application/json", "x-goog-api-key": GEMINI_KEY},
-                json={"contents": messages}
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {os.getenv('OPENROUTER_KEY')}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "anthropic/claude-sonnet-4-5",
+                    "messages": [{"role": m["role"] if m["role"] != "model" else "assistant", "content": m["parts"][0]["text"]} for m in messages],
+                    "max_tokens": 500,
+                    "temperature": 0.1,
+                    "stream": False
+                }
             )
         resp = r.json()
         
-        if "candidates" not in resp:
+        if "choices" not in resp:
             print(f"AI error: {resp}")
             return "⚠️ ИИ временно недоступен", history
 
-        raw = resp["candidates"][0]["content"]["parts"][0]["text"]
+        raw = resp["choices"][0]["message"]["content"] or ""
         print(f"AI step {step}: {raw[:150]}")
         
         # Добавляем ответ ИИ в историю
